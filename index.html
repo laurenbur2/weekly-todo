@@ -183,7 +183,22 @@
   }
   function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-  var tasks = load(KEY_TASKS, []);
+  var SEED = [
+    "Publish on TripAdvisor",
+    "Write Blaine video script",
+    "Publish Liberation program to retreat sites",
+    "Publish Bufo training to Retreat Guru",
+    "Add \"Bufo\" to retreat title on Retreat Guru and BookRetreats.com",
+    "Optimize Blaine's LinkedIn"
+  ];
+  // First visit only: seed the starting list. After that, your saved list wins.
+  var tasks;
+  if (localStorage.getItem(KEY_TASKS) === null) {
+    tasks = SEED.map(function(t) { return { text: t, done: false }; });
+    save(KEY_TASKS, tasks);
+  } else {
+    tasks = load(KEY_TASKS, []);
+  }
 
   // --- date helpers ---
   function mostRecentMonday() {
