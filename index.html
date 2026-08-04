@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly To-Do</title>
+<style>
+  :root {
+    --gold: #b8934a;
+    --gold-soft: #d9b877;
+    --green: #1f3d32;
+    --green-deep: #14261f;
+    --paper: #faf7f0;
+    --ink: #23281f;
+    --line: #e4ddcc;
+    --muted: #8a8674;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 8px; }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 11px;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--green);
+    margin: 6px 0 2px;
+  }
+  .weekof { color: var(--muted); font-size: 15px; }
+
+  /* Monday review banner */
+  .banner {
+    display: none;
+    background: var(--green);
+    color: var(--paper);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin: 22px 0;
+    text-align: center;
+  }
+  .banner.show { display: block; }
+  .banner strong { color: var(--gold-soft); }
+  .banner p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px 22px 8px;
+    margin-top: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+
+  .addrow { display: flex; gap: 10px; margin-bottom: 14px; }
+  #newTask {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #newTask:focus { outline: none; border-color: var(--gold); }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+  .add-btn {
+    background: var(--gold);
+    color: #fff;
+    padding: 0 18px;
+    font-weight: 600;
+  }
+  .add-btn:hover { background: #a6813c; }
+
+  ul { list-style: none; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  li:last-child { border-bottom: none; }
+  li .box {
+    width: 22px; height: 22px;
+    border: 2px solid var(--gold);
+    border-radius: 6px;
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+  li.done .box { background: var(--gold); }
+  li .text { flex: 1; font-size: 16px; word-break: break-word; }
+  li.done .text { text-decoration: line-through; color: var(--muted); }
+  li .del {
+    background: none; color: var(--muted); font-size: 20px;
+    opacity: 0; padding: 0 6px; line-height: 1;
+  }
+  li:hover .del { opacity: 1; }
+  li .del:hover { color: #b04a3a; }
+
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; font-size: 15px; }
+
+  .footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 18px; flex-wrap: wrap; gap: 12px;
+  }
+  .stamp { color: var(--muted); font-size: 13px; }
+  .review-btn {
+    background: var(--green);
+    color: var(--paper);
+    padding: 11px 20px;
+    font-weight: 600;
+  }
+  .review-btn:hover { background: var(--green-deep); }
+  .review-btn.done-state { background: #6f8a7d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Every Monday</div>
+    <h1>Weekly To-Do</h1>
+    <div class="weekof" id="weekof"></div>
+  </header>
+
+  <div class="banner" id="banner">
+    <strong>It's time for your Monday review.</strong>
+    <p>Update your list for the week, then click "Mark this week done" below.</p>
+  </div>
+
+  <div class="card">
+    <div class="addrow">
+      <input id="newTask" type="text" placeholder="Add something for this week..." autocomplete="off">
+      <button class="add-btn" id="addBtn">Add</button>
+    </div>
+    <ul id="list"></ul>
+    <div class="empty" id="empty">Nothing yet. Add your first task for the week.</div>
+    <div class="footer">
+      <span class="stamp" id="stamp"></span>
+      <button class="review-btn" id="reviewBtn">Mark this week done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var KEY_TASKS = "wt_tasks";
+  var KEY_REVIEWED = "wt_lastReviewed";
+
+  var listEl = document.getElementById("list");
+  var emptyEl = document.getElementById("empty");
+  var inputEl = document.getElementById("newTask");
+  var bannerEl = document.getElementById("banner");
+  var stampEl = document.getElementById("stamp");
+  var reviewBtn = document.getElementById("reviewBtn");
+
+  function load(key, fallback) {
+    try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+  var tasks = load(KEY_TASKS, []);
+
+  // --- date helpers ---
+  function mostRecentMonday() {
+    var d = new Date();
+    d.setHours(0,0,0,0);
+    var day = d.getDay();            // 0 Sun ... 1 Mon
+    var diff = (day === 0) ? 6 : day - 1;
+    d.setDate(d.getDate() - diff);
+    return d;
+  }
+  function fmt(date) {
+    return date.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  }
+  function fmtFull(date) {
+    return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
+
+  document.getElementById("weekof").textContent = "Week of " + fmt(mostRecentMonday());
+
+  // --- render ---
+  function render() {
+    listEl.innerHTML = "";
+    tasks.forEach(function(t, i) {
+      var li = document.createElement("li");
+      if (t.done) li.className = "done";
+
+      var box = document.createElement("div");
+      box.className = "box";
+      box.innerHTML = t.done ? "&#10003;" : "";
+      box.onclick = function() { tasks[i].done = !tasks[i].done; save(KEY_TASKS, tasks); render(); };
+
+      var text = document.createElement("div");
+      text.className = "text";
+      text.textContent = t.text;
+
+      var del = document.createElement("button");
+      del.className = "del";
+      del.innerHTML = "&times;";
+      del.title = "Remove";
+      del.onclick = function() { tasks.splice(i, 1); save(KEY_TASKS, tasks); render(); };
+
+      li.appendChild(box);
+      li.appendChild(text);
+      li.appendChild(del);
+      listEl.appendChild(li);
+    });
+    emptyEl.style.display = tasks.length ? "none" : "block";
+    updateReviewState();
+  }
+
+  function addTask() {
+    var v = inputEl.value.trim();
+    if (!v) return;
+    tasks.push({ text: v, done: false });
+    save(KEY_TASKS, tasks);
+    inputEl.value = "";
+    render();
+  }
+  document.getElementById("addBtn").onclick = addTask;
+  inputEl.addEventListener("keydown", function(e) { if (e.key === "Enter") addTask(); });
+
+  // --- review / banner logic ---
+  function needsReview() {
+    var last = load(KEY_REVIEWED, null);
+    if (!last) return true;
+    return new Date(last) < mostRecentMonday();
+  }
+  function updateReviewState() {
+    var last = load(KEY_REVIEWED, null);
+    if (needsReview()) {
+      bannerEl.classList.add("show");
+      stampEl.textContent = last
+        ? "Last reviewed " + fmtFull(new Date(last))
+        : "Not reviewed yet this week";
+      reviewBtn.textContent = "Mark this week done";
+      reviewBtn.classList.remove("done-state");
+    } else {
+      bannerEl.classList.remove("show");
+      stampEl.textContent = "Reviewed " + fmtFull(new Date(last)) + " ✓";
+      reviewBtn.textContent = "Reviewed ✓";
+      reviewBtn.classList.add("done-state");
+    }
+  }
+  reviewBtn.onclick = function() {
+    save(KEY_REVIEWED, new Date().toISOString());
+    render();
+  };
+
+  render();
+  inputEl.focus();
+</script>
+</body>
+</html>
