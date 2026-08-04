@@ -115,6 +115,18 @@
   li.done .box { background: var(--gold); }
   li .text { flex: 1; font-size: 16px; word-break: break-word; }
   li.done .text { text-decoration: line-through; color: var(--muted); }
+  .tag {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid var(--gold-soft);
+    border-radius: 20px;
+    padding: 1px 8px;
+    vertical-align: middle;
+  }
   li .del {
     background: none; color: var(--muted); font-size: 20px;
     opacity: 0; padding: 0 6px; line-height: 1;
@@ -148,8 +160,8 @@
   </header>
 
   <div class="banner" id="banner">
-    <strong>It's time for your Monday review.</strong>
-    <p>Update your list for the week, then click "Mark this week done" below.</p>
+    <strong id="bannerTitle"></strong>
+    <p id="bannerText"></p>
   </div>
 
   <div class="card">
@@ -161,21 +173,21 @@
     <div class="empty" id="empty">Nothing yet. Add your first task for the week.</div>
     <div class="footer">
       <span class="stamp" id="stamp"></span>
-      <button class="review-btn" id="reviewBtn">Mark this week done</button>
     </div>
   </div>
 </div>
 
 <script>
   var KEY_TASKS = "wt_tasks";
-  var KEY_REVIEWED = "wt_lastReviewed";
+  var KEY_WEEKSTART = "wt_weekStart";
 
   var listEl = document.getElementById("list");
   var emptyEl = document.getElementById("empty");
   var inputEl = document.getElementById("newTask");
   var bannerEl = document.getElementById("banner");
+  var bannerTitleEl = document.getElementById("bannerTitle");
+  var bannerTextEl = document.getElementById("bannerText");
   var stampEl = document.getElementById("stamp");
-  var reviewBtn = document.getElementById("reviewBtn");
 
   function load(key, fallback) {
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -218,6 +230,32 @@
 
   document.getElementById("weekof").textContent = "Week of " + fmt(mostRecentMonday());
 
+  // --- weekly rollover: at the start of a new week, clear finished items and
+  //     carry unfinished ones to the top ---
+  var carriedThisWeek = 0;
+  (function rollover() {
+    var curMon = mostRecentMonday();
+    var stored = load(KEY_WEEKSTART, null);
+    if (stored === null) {
+      save(KEY_WEEKSTART, curMon.toISOString());
+      return;
+    }
+    if (new Date(stored) < curMon) {
+      // New week. Drop completed tasks; keep the rest and flag them as carried.
+      var kept = tasks.filter(function(t) { return !t.done; });
+      kept.forEach(function(t) { t.carried = true; });
+      carriedThisWeek = kept.length;
+      tasks = kept;
+      save(KEY_TASKS, tasks);
+      save(KEY_WEEKSTART, curMon.toISOString());
+    }
+  })();
+
+  function isFridayAfternoon() {
+    var now = new Date();
+    return now.getDay() === 5 && now.getHours() >= 12;
+  }
+
   // --- render ---
   function render() {
     listEl.innerHTML = "";
@@ -233,6 +271,12 @@
       var text = document.createElement("div");
       text.className = "text";
       text.textContent = t.text;
+      if (t.carried && !t.done) {
+        var tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = "carried over";
+        text.appendChild(tag);
+      }
 
       var del = document.createElement("button");
       del.className = "del";
@@ -246,7 +290,7 @@
       listEl.appendChild(li);
     });
     emptyEl.style.display = tasks.length ? "none" : "block";
-    updateReviewState();
+    updateBanner();
   }
 
   function addTask() {
@@ -260,32 +304,31 @@
   document.getElementById("addBtn").onclick = addTask;
   inputEl.addEventListener("keydown", function(e) { if (e.key === "Enter") addTask(); });
 
-  // --- review / banner logic ---
-  function needsReview() {
-    var last = load(KEY_REVIEWED, null);
-    if (!last) return true;
-    return new Date(last) < mostRecentMonday();
-  }
-  function updateReviewState() {
-    var last = load(KEY_REVIEWED, null);
-    if (needsReview()) {
+  // --- banner logic ---
+  function updateBanner() {
+    var open = tasks.filter(function(t) { return !t.done; }).length;
+    var done = tasks.length - open;
+
+    if (carriedThisWeek > 0) {
+      bannerTitleEl.textContent = "New week.";
+      bannerTextEl.textContent = carriedThisWeek + " unfinished " +
+        (carriedThisWeek === 1 ? "task" : "tasks") +
+        " carried over to the top. Add anything new for the week.";
       bannerEl.classList.add("show");
-      stampEl.textContent = last
-        ? "Last reviewed " + fmtFull(new Date(last))
-        : "Not reviewed yet this week";
-      reviewBtn.textContent = "Mark this week done";
-      reviewBtn.classList.remove("done-state");
+    } else if (isFridayAfternoon()) {
+      bannerTitleEl.textContent = "It's Friday afternoon.";
+      bannerTextEl.textContent = open === 0
+        ? "Everything's checked off. Nice week."
+        : "Check off what you finished. Whatever's left rolls to the top on Monday.";
+      bannerEl.classList.add("show");
     } else {
       bannerEl.classList.remove("show");
-      stampEl.textContent = "Reviewed " + fmtFull(new Date(last)) + " ✓";
-      reviewBtn.textContent = "Reviewed ✓";
-      reviewBtn.classList.add("done-state");
     }
+
+    stampEl.textContent = tasks.length
+      ? open + " to do · " + done + " done"
+      : "";
   }
-  reviewBtn.onclick = function() {
-    save(KEY_REVIEWED, new Date().toISOString());
-    render();
-  };
 
   render();
   inputEl.focus();
