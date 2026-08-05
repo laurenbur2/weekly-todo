@@ -136,6 +136,23 @@
 
   .empty { color: var(--muted); text-align: center; padding: 24px 0; font-size: 15px; }
 
+  .finished { display: none; border-top: 1px solid var(--line); margin-top: 4px; }
+  .fin-toggle {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%;
+    background: none;
+    color: var(--muted);
+    padding: 14px 4px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: left;
+  }
+  .fin-toggle:hover { color: var(--green); }
+  .chev { display: inline-block; transition: transform 0.15s; font-size: 12px; }
+  .fin-count { color: var(--gold); }
+  .fin-list { list-style: none; padding-bottom: 6px; }
+
   .footer {
     display: flex; justify-content: space-between; align-items: center;
     margin-top: 18px; flex-wrap: wrap; gap: 12px;
@@ -171,6 +188,14 @@
     </div>
     <ul id="list"></ul>
     <div class="empty" id="empty">Nothing yet. Add your first task for the week.</div>
+    <div class="finished" id="finished">
+      <button class="fin-toggle" id="finToggle" type="button">
+        <span class="chev" id="chev">&#9656;</span>
+        <span>Finished tasks</span>
+        <span class="fin-count" id="finCount"></span>
+      </button>
+      <ul id="finList" class="fin-list"></ul>
+    </div>
     <div class="footer">
       <span class="stamp" id="stamp"></span>
     </div>
@@ -188,6 +213,11 @@
   var bannerTitleEl = document.getElementById("bannerTitle");
   var bannerTextEl = document.getElementById("bannerText");
   var stampEl = document.getElementById("stamp");
+  var finishedEl = document.getElementById("finished");
+  var finToggle = document.getElementById("finToggle");
+  var finListEl = document.getElementById("finList");
+  var finCountEl = document.getElementById("finCount");
+  var chevEl = document.getElementById("chev");
 
   function load(key, fallback) {
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -278,41 +308,66 @@
   }
 
   // --- render ---
+  var finishedExpanded = false;
+
+  function makeLi(t, i) {
+    var li = document.createElement("li");
+    if (t.done) li.className = "done";
+
+    var box = document.createElement("div");
+    box.className = "box";
+    box.innerHTML = t.done ? "&#10003;" : "";
+    box.onclick = function() { tasks[i].done = !tasks[i].done; save(KEY_TASKS, tasks); render(); };
+
+    var text = document.createElement("div");
+    text.className = "text";
+    text.textContent = t.text;
+    if (t.carried && !t.done) {
+      var tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = "carried over";
+      text.appendChild(tag);
+    }
+
+    var del = document.createElement("button");
+    del.className = "del";
+    del.innerHTML = "&times;";
+    del.title = "Remove";
+    del.onclick = function() { tasks.splice(i, 1); save(KEY_TASKS, tasks); render(); };
+
+    li.appendChild(box);
+    li.appendChild(text);
+    li.appendChild(del);
+    return li;
+  }
+
   function render() {
     listEl.innerHTML = "";
+    finListEl.innerHTML = "";
+    var openCount = 0, doneCount = 0;
+
     tasks.forEach(function(t, i) {
-      var li = document.createElement("li");
-      if (t.done) li.className = "done";
-
-      var box = document.createElement("div");
-      box.className = "box";
-      box.innerHTML = t.done ? "&#10003;" : "";
-      box.onclick = function() { tasks[i].done = !tasks[i].done; save(KEY_TASKS, tasks); render(); };
-
-      var text = document.createElement("div");
-      text.className = "text";
-      text.textContent = t.text;
-      if (t.carried && !t.done) {
-        var tag = document.createElement("span");
-        tag.className = "tag";
-        tag.textContent = "carried over";
-        text.appendChild(tag);
-      }
-
-      var del = document.createElement("button");
-      del.className = "del";
-      del.innerHTML = "&times;";
-      del.title = "Remove";
-      del.onclick = function() { tasks.splice(i, 1); save(KEY_TASKS, tasks); render(); };
-
-      li.appendChild(box);
-      li.appendChild(text);
-      li.appendChild(del);
-      listEl.appendChild(li);
+      if (t.done) { finListEl.appendChild(makeLi(t, i)); doneCount++; }
+      else { listEl.appendChild(makeLi(t, i)); openCount++; }
     });
-    emptyEl.style.display = tasks.length ? "none" : "block";
+
+    emptyEl.style.display = openCount ? "none" : "block";
+    emptyEl.textContent = tasks.length
+      ? "All done for this week. Nice."
+      : "Nothing yet. Add your first task for the week.";
+
+    finishedEl.style.display = doneCount ? "block" : "none";
+    finCountEl.textContent = doneCount ? "(" + doneCount + ")" : "";
+    finListEl.style.display = finishedExpanded ? "block" : "none";
+    chevEl.style.transform = finishedExpanded ? "rotate(90deg)" : "rotate(0deg)";
+
     updateBanner();
   }
+
+  finToggle.onclick = function() {
+    finishedExpanded = !finishedExpanded;
+    render();
+  };
 
   function addTask() {
     var v = inputEl.value.trim();
