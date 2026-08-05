@@ -201,7 +201,8 @@
     "Publish Liberation program to retreat sites",
     "Publish Bufo training to Retreat Guru",
     "Add \"Bufo\" to retreat title on Retreat Guru and BookRetreats.com",
-    "Optimize Blaine's LinkedIn"
+    "Optimize Blaine's LinkedIn",
+    "Make payment plans on Stripe"
   ];
   // First visit only: seed the starting list. After that, your saved list wins.
   var tasks;
@@ -211,6 +212,26 @@
   } else {
     tasks = load(KEY_TASKS, []);
   }
+
+  // One-time additions for browsers that already have a saved list.
+  // Applied once each (won't re-add if you later delete the task).
+  (function migrate() {
+    var applied = load("wt_migrations", []);
+    var adds = [
+      { id: "stripe-payment-plans", text: "Make payment plans on Stripe" }
+    ];
+    var changed = false;
+    adds.forEach(function(a) {
+      if (applied.indexOf(a.id) === -1) {
+        if (!tasks.some(function(t) { return t.text === a.text; })) {
+          tasks.push({ text: a.text, done: false });
+        }
+        applied.push(a.id);
+        changed = true;
+      }
+    });
+    if (changed) { save(KEY_TASKS, tasks); save("wt_migrations", applied); }
+  })();
 
   // --- date helpers ---
   function mostRecentMonday() {
